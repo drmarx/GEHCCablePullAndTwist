@@ -17,4 +17,9 @@
   <ItemGroup>
     <None Include="GEHCCablePullAndTwist.ino" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="__vm\.GEHCCablePullAndTwist.vsarduino.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>
