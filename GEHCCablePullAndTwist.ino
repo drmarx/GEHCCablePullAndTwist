@@ -111,7 +111,7 @@ void getCont() {
 		float buf = raw * 5;
 		float v = buf / 1024;
 		buf = (5 / v) - 1;
-		cont = 998 * buf; // measured value of pull-up resistor for greatest accuracy
+		cont = 1000 * buf;
 	}
 	else cont = 0;
 }
