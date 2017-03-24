@@ -33,16 +33,20 @@ void loop() {
 
 void command(String cmd) {
 	if (cmd.startsWith("TEST") && !(running)) {
-		String arg1 = getValue(cmd, ' ', 1);
-		String arg2 = getValue(cmd, ' ', 2);
-		String arg3 = getValue(cmd, ' ', 3);
-		String arg4 = getValue(cmd, ' ', 4);
-		String arg5 = getValue(cmd, ' ', 5);
-		p.mins = arg1.toInt();
-		p.reps = arg2.toInt();
-		p.force = arg3.toFloat();
-		p.cont = arg4.toInt();
-		p.freq = arg5.toFloat();
+		String args[5];
+		for (int i = 0; i < 5; i++) {
+			args[i] = getValue(cmd, ' ', i + 1);
+		}
+//		String arg1 = getValue(cmd, ' ', 1);
+//		String arg2 = getValue(cmd, ' ', 2);
+//		String arg3 = getValue(cmd, ' ', 3);
+//		String arg4 = getValue(cmd, ' ', 4);
+//		String arg5 = getValue(cmd, ' ', 5);
+		p.mins = args[0].toInt();
+		p.reps = args[1].toInt();
+		p.force = args[2].toFloat();
+		p.cont = args[3].toInt();
+		p.freq = args[4].toFloat();
 		Serial.println("Parameters received. Ready to start.");
 		//runTest(mins,reps);
 	}
