@@ -1,7 +1,7 @@
 #include "Main.h"
 const int tempSensor = A0; // DEBUG sample sensor
 const int contSensor = A1;
-static char tdata[8]; // DEBUG sample sensor data
+static float temp; // DEBUG sample sensor data
 static float load;
 static float spinpos;
 static float cont;
@@ -37,25 +37,19 @@ void command(String cmd) {
 		for (int i = 0; i < 5; i++) {
 			args[i] = getValue(cmd, ' ', i + 1);
 		}
-//		String arg1 = getValue(cmd, ' ', 1);
-//		String arg2 = getValue(cmd, ' ', 2);
-//		String arg3 = getValue(cmd, ' ', 3);
-//		String arg4 = getValue(cmd, ' ', 4);
-//		String arg5 = getValue(cmd, ' ', 5);
 		p.mins = args[0].toInt();
 		p.reps = args[1].toInt();
 		p.force = args[2].toFloat();
 		p.cont = args[3].toInt();
 		p.freq = args[4].toFloat();
 		Serial.println("Parameters received. Ready to start.");
-		//runTest(mins,reps);
 	}
 	else if (cmd.equalsIgnoreCase("START") && !(running)) {
 		runTest();
 	}
 	else if (cmd.equalsIgnoreCase("TEMP")) {
 		getTemp();
-		Serial.println(tdata);
+		Serial.println(temp);
 	}
 }
 
@@ -78,9 +72,9 @@ void runTest() {
 			Serial.print(" ");
 			Serial.print(j);
 			Serial.print("s: Temp = ");
-			Serial.print(tdata);
+			Serial.print(temp);
 			Serial.print("F  Cont = ");
-			if (getCont()) {
+			if (cont > 0) {
 				Serial.print(cont);
 				Serial.println("ohm");
 			}
@@ -98,11 +92,7 @@ void runTest() {
 bool emergencyStop() {
 	String in;
 	if (Serial.available()) in = Serial.readString();
-	if (in.equals("STOP")) {
-		running = false;
-		return true;
-	}
-	if (p.cont && !(getCont())) {
+	if (in.equalsIgnoreCase("STOP") || (p.cont && cont == 0)) {
 		running = false;
 		return true;
 	}
@@ -112,21 +102,18 @@ bool emergencyStop() {
 void getTemp() {
 	int in = analogRead(tempSensor);
 	float voltage = (in / 1024.0) * 5.0; // convert analog to voltage
-	float temp = ((voltage - 0.5) * 100) * 1.8 + 32; // convert voltage to temp in C then to F
-	dtostrf(temp, 4, 2, tdata);
+	temp = ((voltage - 0.5) * 100) * 1.8 + 32; // convert voltage to temp in C then to F
 }
 
-bool getCont() {
+void getCont() {
 	int raw = analogRead(contSensor);
 	if (raw) {
 		float buf = raw * 5;
 		float v = buf / 1024;
 		buf = (5 / v) - 1;
-		cont = 998 * buf; // measured value of resistor
-		return true;
+		cont = 998 * buf; // measured value of pull-up resistor for greatest accuracy
 	}
 	else cont = 0;
-	return false;
 }
 
 String getValue(String data, char separator, int index) { // splits input string by char separator, pieces accessible by index 0..*
