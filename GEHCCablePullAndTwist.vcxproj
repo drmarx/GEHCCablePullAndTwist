@@ -83,9 +83,6 @@
     <ClInclude Include="Main.h" />
     <ClInclude Include="__vm\.GEHCCablePullAndTwist.vsarduino.h" />
   </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Main.cpp" />
-  </ItemGroup>
   <PropertyGroup>
     <DebuggerFlavor>VisualMicroDebugger</DebuggerFlavor>
   </PropertyGroup>

@@ -1,4 +1,4 @@
-#include "Main.h"
+// #include "Main.h"
 const int tempSensor = A0; // DEBUG sample sensor
 const int contSensor = A1;
 static float temp; // DEBUG sample sensor data
@@ -10,6 +10,7 @@ struct params {
 	int mins;
 	int reps;
 	float force;
+	int deg;
 	bool cont;
 	float freq;
 };
@@ -22,7 +23,7 @@ void setup() {
 	Serial.begin(9600);
 	Serial.println("GEHC Cable Pull & Twist initialized. Awaiting commands...");
 	Serial.println("Available commands: TEST <length of test (minutes)> <number of tests> <target force (kgs)>");
-	Serial.println("<stop on continuity break [0,1]> <data frequency (seconds)>, START, STOP, TEMP");
+	Serial.println("<spin turn (degrees)> <stop on continuity break [0,1]> <data frequency (seconds)>, START, STOP, TEMP");
 }
 
 void loop() {
@@ -33,13 +34,14 @@ void loop() {
 
 void command(String cmd) {
 	if (cmd.startsWith("TEST") && !(running)) {
-		String args[5];
-		for (int i = 0; i < 5; i++) {
+		String args[6];
+		for (int i = 0; i < 6; i++) {
 			args[i] = getValue(cmd, ' ', i + 1);
 		}
 		p.mins = args[0].toInt();
 		p.reps = args[1].toInt();
 		p.force = args[2].toFloat();
+		p.deg = args[3].toInt();
 		p.cont = args[3].toInt();
 		p.freq = args[4].toFloat();
 		Serial.println("Parameters received. Ready to start.");
