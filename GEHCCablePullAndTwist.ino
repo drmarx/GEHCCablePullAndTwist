@@ -8,6 +8,7 @@ static float cont;
 static bool running;
 struct params {
 	int mins;
+	int rest;
 	int reps;
 	float force;
 	int deg;
@@ -15,15 +16,17 @@ struct params {
 	float freq;
 };
 typedef struct params Params;
-static Params p;
+static Params p;	// test parameters
+
 
 void setup() {
 	// Initialize
 	running = false;
 	Serial.begin(9600);
+	Serial.setTimeout(100);
 	Serial.println("GEHC Cable Pull & Twist initialized. Awaiting commands...");
-	Serial.println("Available commands: TEST <length of test (minutes)> <number of tests> <target force (kgs)>");
-	Serial.println("<spin turn (degrees)> <stop on continuity break [0,1]> <data frequency (seconds)>, START, STOP, TEMP");
+	Serial.println("Available commands: TEST <length of test in minutes<int>> <rest time in seconds<int>> <test repetitions<int>> <force in kgs<float>>");
+	Serial.println("<spin turn degrees<int>> <continuity break stop<int[0,1]>>, START, STOP, TEMP, DATA, RATE<poll rate in seconds<float>>");
 }
 
 void loop() {
@@ -39,17 +42,27 @@ void command(String cmd) {
 			args[i] = getValue(cmd, ' ', i + 1);
 		}
 		p.mins = args[0].toInt();
-		p.reps = args[1].toInt();
-		p.force = args[2].toFloat();
-		p.deg = args[3].toInt();
-		p.cont = args[3].toInt();
-		p.freq = args[4].toFloat();
+		p.rest = args[1].toInt();
+		p.reps = args[2].toInt();
+		p.force = args[3].toFloat();
+		p.deg = args[4].toInt();
+		p.cont = args[5].toInt();
 		Serial.println("Parameters received. Ready to start.");
 	}
-	else if (cmd.equalsIgnoreCase("START") && !(running)) {
+	else if (cmd.startsWith("RATE")) {
+		p.freq = getValue(cmd, ' ', 1).toFloat();
+	}
+	else if (cmd.equals("START") && !(running)) {
 		runTest();
 	}
-	else if (cmd.equalsIgnoreCase("TEMP")) {
+	else if (cmd.equals("DATA")) {
+		Serial.print(load);
+		Serial.print(" ");
+		Serial.print(spinpos);
+		Serial.print(" ");
+		Serial.println(cont);
+	}
+	else if (cmd.equals("TEMP")) {
 		getTemp();
 		Serial.println(temp);
 	}
@@ -104,16 +117,20 @@ bool emergencyStop() {
 void getTemp() {
 	int in = analogRead(tempSensor);
 	float voltage = (in / 1024.0) * 5.0; // convert analog to voltage
-	temp = ((voltage - 0.5) * 100) * 1.8 + 32; // convert voltage to temp in C then to F
+	temp = ((voltage - 0.5) * 100.0) * 1.8 + 32.0; // convert voltage to temp in C then to F
 }
 
-void getCont() {
-	int raw = analogRead(contSensor);
-	if (raw) {
-		float buf = raw * 5;
+void getCont() { // measures resistance in ohms, 0 if disconnected
+	int in = analogRead(contSensor);
+	if (in) {
+		/*
+		float buf = in * 5;
 		float v = buf / 1024;
 		buf = (5 / v) - 1;
 		cont = 1000 * buf;
+		*/
+		float voltage = (in / 1024.0) * 5.0;
+		cont = ((5.0 / voltage) - 1.0) * 1000.0;
 	}
 	else cont = 0;
 }
