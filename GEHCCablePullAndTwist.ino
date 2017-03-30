@@ -35,8 +35,6 @@ static Params p;	// test parameters
 void setup() {
 	// Initialize
 	runningTest = false;
-	Serial.begin(9600);
-	Serial.setTimeout(100);
 	spinSpeed = 10; // DEBUG: example speed
 	linSpeed = 10; // DEBUG: example speed
 	pinMode(spinPosA, INPUT_PULLUP);
@@ -45,11 +43,13 @@ void setup() {
 	pinMode(spinPinPwm, OUTPUT);
 	pinMode(linPinDir, OUTPUT);
 	pinMode(linPinPwm, OUTPUT);
-	attachInterrupt(0, encoderA, RISING);
-	attachInterrupt(1, encoderB, RISING);
-	Serial.println("GEHC Cable Pull & Twist initialized. Awaiting commands...");
-	Serial.println("Available commands: TEST <length of test in minutes<int>> <rest time in seconds<int>> <test repetitions<int>> <force in kgs<float>>");
-	Serial.println("<spin turn degrees<int>> <continuity break stop<int[0,1]>>, START, STOP, TEMP, RATE <poll rate in seconds<float>>");
+	attachInterrupt(0, encoder, CHANGE);
+	attachInterrupt(1, encoder, CHANGE);
+	Serial.begin(9600);
+	Serial.setTimeout(100);
+	//Serial.println("GEHC Cable Pull & Twist initialized. Awaiting commands...");
+	//Serial.println("Available commands: TEST <length of test in minutes<int>> <rest time in seconds<int>> <test repetitions<int>> <force in kgs<float>>");
+	//Serial.println("<spin turn degrees<int>> <continuity break stop<int[0,1]>>, START, STOP, TEMP, RATE <poll rate in seconds<float>>");
 }
 
 void loop() {
@@ -134,8 +134,6 @@ void runTest() {
 	runningTest = false;
 }
 
-// TODO: add more methods for spin, pull
-
 bool emergencyStop() {
 	String in;
 	if (Serial.available()) in = Serial.readString();
@@ -155,38 +153,35 @@ void getTemp() {
 void getCont() { // measures resistance in ohms, 0 if disconnected
 	int in = analogRead(contSensor);
 	if (in) {
-		/*
-		float buf = in * 5;
-		float v = buf / 1024;
-		buf = (5 / v) - 1;
-		cont = 1000 * buf;
-		*/
 		float voltage = (in / 1024.0) * 5.0;
 		cont = ((5.0 / voltage) - 1.0) * 1000.0;
 	}
 	else cont = 0;
 }
 
-void spinMotor(int d) {
+void spin(int d) {
 	if (d > 0) {
 		while (spinPos != d) {
 			analogWrite(spinPinPwm, spinSpeed);
 			digitalWrite(spinPinDir, LOW);
+			delay(10);
 		}
 	}
 	else {
 		while (spinPos != 0){
 			analogWrite(spinPinPwm, -spinSpeed);
 			digitalWrite(spinPinDir, HIGH);
+			delay(10);
 		}
 	}
 }
 
-void linearActuator(int f) {
+void linear(int f) {
 	if (f > 0) {
 		while (load < f) {
 			analogWrite(linPinPwm, linSpeed);
 			digitalWrite(linPinDir, LOW);
+			delay(10);
 		}
 	}
 	else {
@@ -201,29 +196,61 @@ void getLoad() {
 	load = 0;
 }
 
-void encoderA() {
-	cli(); //stop interrupts happening before we read pin values
-	readEncoder = PIND & 0xC; // read all eight pin values then strip away all but pinA and pinB's values
-	if (readEncoder == B00001100 && aFlag) { //check that we have both pins at detent (HIGH) and that we are expecting detent on this pin's rising edge
-		spinPos--; //decrement the encoder's position count
-		bFlag = 0; //reset flags for the next turn
-		aFlag = 0; //reset flags for the next turn
-	}
-	else if (readEncoder == B00000100) bFlag = 1; //signal that we're expecting pinB to signal the transition to detent from free rotation
-	sei(); //restart interrupts
-}
-
-void encoderB() {
+void encoder() { // interrupts on rise and fall
+	/*
+		aFlag holds the last position of A
+		bFlag holds the last position of B
+		These positions are compared for each combination of A and B detected
+		if B changes away from A, and A changes to match B, CW
+		if A changes away from B, and B changes to match A, CCW
+	*/
 	cli(); //stop interrupts happening before we read pin values
 	readEncoder = PIND & 0xC; //read all eight pin values then strip away all but pinA and pinB's values
-	if (readEncoder == B00001100 && bFlag) { //check that we have both pins at detent (HIGH) and that we are expecting detent on this pin's rising edge
-		spinPos++; //increment the encoder's position count
-		bFlag = 0; //reset flags for the next turn
-		aFlag = 0; //reset flags for the next turn
+	switch (readEncoder) {
+		case B00000000:
+			if (!(aFlag) && bFlag) { //CCW
+				spinPos--; //decrement the encoder's position count
+				bFlag = 0; //updates current position for next interrupt compare
+			}
+			else if (aFlag && !(bFlag)) { //CW
+				spinPos++; //increment the encoder's position count
+				aFlag = 0; //updates current position for next interrupt compare
+			}
+			break;
+		case B00000100:
+			if (aFlag && bFlag) { //CCW
+				spinPos--; //decrement the encoder's position count
+				aFlag = 0; //updates current position for next interrupt compare
+			}
+			else if (!(aFlag) && !(bFlag)) { //CW
+				spinPos++; //increment the encoder's position count
+				bFlag = 1; //updates current position for next interrupt compare
+			}
+			break;
+		case B00001000:
+			if (!(aFlag) && !(bFlag)) {
+				spinPos--; //decrement the encoder's position count
+				aFlag = 1; //updates current position for next interrupt compare
+			}
+			else if (aFlag && bFlag) {
+				spinPos++; //increment the encoder's position count
+				bFlag = 0; //updates current position for next interrupt compare
+			}
+			break;
+		case B00001100:
+			if (aFlag && !(bFlag)) { //CCW
+				spinPos--; //decrement the encoder's position count
+				bFlag = 1; //updates current position for next interrupt compare
+			}
+			else if (!(aFlag) && bFlag) { //CW
+				spinPos++; //increment the encoder's position count
+				aFlag = 1; //updates current position for next interrupt compare
+			}
+			break;
+		default:
+			break;
 	}
-	else if (readEncoder == B00001000) aFlag = 1; //signal that we're expecting pinA to signal the transition to detent from free rotation
 	sei(); //restart interrupts
-
 }
 
 String parse(String data, char separator, int index) { // splits input string by char separator, pieces accessible by index 0..*
