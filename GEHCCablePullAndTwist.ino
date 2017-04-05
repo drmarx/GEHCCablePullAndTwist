@@ -1,17 +1,19 @@
 // #include "Main.h"
 const int tempSensor = A0; // DEBUG sample sensor
-const int contSensor = A1;
-const int spinPinPwm = 5;
-const int spinPinDir = 4;
-const int linPinPwm = 6;
-const int linPinDir = 7;
-const int spinPosA = 2;
-const int spinPosB = 3;
-volatile byte aFlag = 0;
-volatile byte bFlag = 0;
-volatile byte spinPos = 0;
-volatile byte oldSpinPos = 0;
-volatile byte readEncoder;
+const int contSensor = A1; // pin for continuity resistance test
+const int spinPinPwm = 5; // pin for spin motor shield pwm
+const int spinPinDir = 4; // pin for spin motor shield direction
+const int linPinPwm = 6; // pin for linear actuator motor shield pwm
+const int linPinDir = 7; // pin for linear acutator motor shield direction
+const int spinPosA = 2; // pin for spin motor rotory encoder channel A
+const int spinPosB = 3; // pin for spin motor rotory encoder channel B
+
+volatile byte aFlag = 0; // variable for storing previous A value
+volatile byte bFlag = 0; // variable for storing previous B value
+volatile byte spinPos = 0; // variable for storing spin motor position
+volatile byte oldSpinPos = 0; // variable for previous spin motor position
+volatile byte readEncoder; // variable for reading input data from encoder
+
 static int spinSpeed = 0;
 static int linSpeed = 0;
 static float temp; // DEBUG sample sensor data
@@ -19,6 +21,7 @@ static float load;
 //static float spinPos;
 static float cont;
 static bool runningTest;
+
 struct params {
 	int mins;
 	int rest;
@@ -89,6 +92,10 @@ void command(String cmd) {
 		getTemp();
 		Serial.println(temp);
 	}
+	else if (cmd.startsWith("SPIN")) {
+		int arg = parse(cmd, ' ', 1).toInt();
+		spin(arg);
+	}
 }
 
 void runTest() {
@@ -114,7 +121,9 @@ void runTest() {
 			Serial.print(j);
 			Serial.print("s: Temp = ");
 			Serial.print(temp);
-			Serial.print("F  Cont = ");
+			Serial.print("F Spin = ");
+			Serial.print(spinPos);
+			Serial.print("u Cont = ");
 			if (cont > 0) {
 				Serial.print(cont);
 				Serial.println("ohm");
@@ -250,6 +259,7 @@ void encoder() { // interrupts on rise and fall
 		default:
 			break;
 	}
+	//Serial.println("Spin Position = " + spinPos); // DEBUG
 	sei(); //restart interrupts
 }
 
