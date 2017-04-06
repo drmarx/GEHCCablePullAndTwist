@@ -5,9 +5,8 @@ const int spinPinPwm = 6; // pin for spin motor shield pwm
 const int spinPinDir = 7; // pin for spin motor shield direction
 const int linPinPwm = 5; // pin for linear actuator motor shield pwm
 const int linPinDir = 4; // pin for linear acutator motor shield direction
-const int spinPosA = 3; // pin for spin motor rotory encoder channel A
-const int spinPosB = 2; // pin for spin motor rotory encoder channel B
-
+const int spinPosA = 2; // pin for spin motor rotory encoder channel A
+const int spinPosB = 3; // pin for spin motor rotory encoder channel B
 volatile byte aFlag = 0; // variable for storing previous A value
 volatile byte bFlag = 0; // variable for storing previous B value
 volatile int spinPos = 0; // variable for storing spin motor position
@@ -211,6 +210,8 @@ void encoderA() { // Channel A went High
 	if (bFlag) {
 		spinPos++; //increament the encoder's position count
 	}
+	Serial.print("Spin Position = "); // DEBUG messages
+	Serial.println(spinPos);
 	sei(); //restart interrupts
 }
 
@@ -220,6 +221,8 @@ void encoderB() { // Channel B went High
 	if (aFlag) {
 		spinPos--; //increament the encoder's position count
 	}
+	Serial.print("Spin Position = "); // DEBUG messages
+	Serial.println(spinPos);
 	sei(); //restart interrupts
 }
 
