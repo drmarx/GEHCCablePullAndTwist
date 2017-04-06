@@ -9,7 +9,7 @@ const int spinPosA = 2; // pin for spin motor rotory encoder channel A
 const int spinPosB = 3; // pin for spin motor rotory encoder channel B
 volatile byte aFlag = 0; // variable for storing previous A value
 volatile byte bFlag = 0; // variable for storing previous B value
-volatile int spinPos = 0; // variable for storing spin motor position
+volatile long spinPos = 0; // variable for storing spin motor position
 //volatile byte oldSpinPos = 0; // variable for previous spin motor position
 volatile byte readEncoder; // variable for reading input data from encoder
 
@@ -93,6 +93,7 @@ void command(String cmd) {
 	}
 	else if (cmd.startsWith("SPIN")) {
 		int arg = parse(cmd, ' ', 1).toInt();
+		runningTest = true;
 		spin(arg);
 	}
 }
@@ -167,26 +168,46 @@ void getCont() { // measures resistance in ohms, 0 if disconnected
 	else cont = 0;
 }
 
-void spin(int d) {
+void spin(long d) {
+	Serial.println("Spin started");
 	if (d > 0) {
-		while (spinPos != d) {
-			analogWrite(spinPinPwm, spinSpeed);
+		while (spinPos < d) {
+			if (emergencyStop()) { // emergency stop
+				Serial.println("ALERT: EMERGENCY STOP");
+				break;
+			}
+			analogWrite(spinPinPwm, -spinSpeed);
 			digitalWrite(spinPinDir, LOW);
-			delay(10);
+			Serial.print("Spin Position = "); // DEBUG messages
+			Serial.println(spinPos);
+			delay(100);
 		}
 	}
 	else {
-		while (spinPos != 0){
+		while (spinPos > 0){
+			if (emergencyStop()) { // emergency stop
+				Serial.println("ALERT: EMERGENCY STOP");
+				break;
+			}
 			analogWrite(spinPinPwm, -spinSpeed);
 			digitalWrite(spinPinDir, HIGH);
-			delay(10);
+			Serial.print("Spin Position = "); // DEBUG messages
+			Serial.println(spinPos);
+			delay(100);
 		}
 	}
+	runningTest = false;
+	analogWrite(spinPinPwm, 0);
+	Serial.println("Spin stopped");
 }
 
 void linear(int f) {
 	if (f > 0) {
 		while (load < f) {
+			if (emergencyStop()) { // emergency stop
+				Serial.println("ALERT: EMERGENCY STOP");
+				break;
+			}
 			analogWrite(linPinPwm, linSpeed);
 			digitalWrite(linPinDir, LOW);
 			delay(10);
@@ -194,6 +215,10 @@ void linear(int f) {
 	}
 	else {
 		while (load != 0) {
+			if (emergencyStop()) { // emergency stop
+				Serial.println("ALERT: EMERGENCY STOP");
+				break;
+			}
 			analogWrite(linPinPwm, -linSpeed);
 			digitalWrite(linPinDir, HIGH);
 		}
@@ -208,10 +233,10 @@ void encoderA() { // Channel A went High
 	cli(); //stop interrupts happening before we read pin values
 	bFlag = digitalRead(spinPosB);
 	if (bFlag) {
-		spinPos++; //increament the encoder's position count
+		spinPos--; //increment the encoder's position count
 	}
-	Serial.print("Spin Position = "); // DEBUG messages
-	Serial.println(spinPos);
+	//Serial.print("Spin Position = "); // DEBUG messages
+	//Serial.println(spinPos);
 	sei(); //restart interrupts
 }
 
@@ -219,10 +244,10 @@ void encoderB() { // Channel B went High
 	cli(); //stop interrupts happening before we read pin values
 	aFlag = digitalRead(spinPosA);
 	if (aFlag) {
-		spinPos--; //increament the encoder's position count
+		spinPos++; //decrement the encoder's position count
 	}
-	Serial.print("Spin Position = "); // DEBUG messages
-	Serial.println(spinPos);
+	//Serial.print("Spin Position = "); // DEBUG messages
+	//Serial.println(spinPos);
 	sei(); //restart interrupts
 }
 
