@@ -1,18 +1,20 @@
-// #include "Main.h"
+#include <dht11.h> // temp/humid sensor
+#define DHT11_PIN 8
 const int tempSensor = A0; // DEBUG sample sensor
 const int contSensor = A1; // pin for continuity resistance test
 const int spinPinPwm = 6; // pin for spin motor shield pwm
 const int spinPinDir = 7; // pin for spin motor shield direction
 const int linPinPwm = 5; // pin for linear actuator motor shield pwm
 const int linPinDir = 4; // pin for linear acutator motor shield direction
-const int spinPosA = 2; // pin for spin motor rotory encoder channel A
-const int spinPosB = 3; // pin for spin motor rotory encoder channel B
+const int spinPosA = 2; // pin for spin motor rotory encoder channel A YELLOW
+const int spinPosB = 3; // pin for spin motor rotory encoder channel B BROWN
 volatile byte aFlag = 0; // variable for storing previous A value
 volatile byte bFlag = 0; // variable for storing previous B value
 volatile long spinPos = 0; // variable for storing spin motor position
 //volatile byte oldSpinPos = 0; // variable for previous spin motor position
 volatile byte readEncoder; // variable for reading input data from encoder
 
+static dht11 DHT; // temp/humid object
 static int spinSpeed = 0;
 static int linSpeed = 0;
 static float temp; // DEBUG sample sensor data
@@ -26,7 +28,7 @@ struct params {
 	int rest;
 	int reps;
 	float force;
-	int deg;
+	int deg; // 8652 count = 360 deg => 24 counts = 1 deg
 	bool cont;
 	float freq;
 };
@@ -37,7 +39,7 @@ static Params p;	// test parameters
 void setup() {
 	// Initialize
 	runningTest = false;
-	spinSpeed = 10; // DEBUG: example speed
+	spinSpeed = 255; // spin speed 8-255
 	linSpeed = 10; // DEBUG: example speed
 	pinMode(spinPosA, INPUT_PULLUP);
 	pinMode(spinPosB, INPUT_PULLUP);
@@ -46,7 +48,7 @@ void setup() {
 	pinMode(linPinDir, OUTPUT);
 	pinMode(linPinPwm, OUTPUT);
 	attachInterrupt(0, encoderA, RISING);
-	attachInterrupt(1, encoderB, RISING);
+	//attachInterrupt(1, encoder, CHANGE);
 	Serial.begin(9600);
 	Serial.setTimeout(100);
 	Serial.println("GEHC Cable Pull & Twist initialized. Awaiting commands...");
@@ -56,8 +58,10 @@ void setup() {
 
 void loop() {
 	String in;
-	in = Serial.readString();
+	if (Serial.available()) in = Serial.readString();
 	command(in);
+	Serial.print("Spin Position ");
+	Serial.println(spinPos);
 }
 
 void command(String cmd) {
@@ -70,7 +74,7 @@ void command(String cmd) {
 		p.rest = args[1].toInt();
 		p.reps = args[2].toInt();
 		p.force = args[3].toFloat();
-		p.deg = args[4].toInt();
+		p.deg = args[4].toInt() * 24; // converts degrees to spin counter units
 		p.cont = args[5].toInt();
 		Serial.println("Parameters received. Ready to start.");
 	}
@@ -88,8 +92,14 @@ void command(String cmd) {
 		Serial.println(cont);
 	}
 	else if (cmd.equals("TEMP")) {
-		getTemp();
-		Serial.println(temp);
+		//getTemp();
+		DHT.read(DHT11_PIN);
+		//Serial.print(temp);
+		//Serial.println(" F");
+		Serial.print(DHT.temperature);
+		Serial.println(" C");
+		Serial.print(DHT.humidity);
+		Serial.println(" %");
 	}
 	else if (cmd.startsWith("SPIN")) {
 		int arg = parse(cmd, ' ', 1).toInt();
@@ -113,6 +123,12 @@ void runTest() {
 			//linearActuator(p.force);
 			getTemp();
 			getCont();
+			// access test data with variables
+			// pulled force = load
+			// temperature = DHT.temperature
+			// humidity = DHT.humidity
+			// spin position = spinPos
+			// print data with Serial.print() with the last one being .println()
 			Serial.print("Test ");
 			Serial.print(i);
 			Serial.print("/");
@@ -176,11 +192,11 @@ void spin(long d) {
 				Serial.println("ALERT: EMERGENCY STOP");
 				break;
 			}
-			analogWrite(spinPinPwm, -spinSpeed);
+			analogWrite(spinPinPwm, spinSpeed);
 			digitalWrite(spinPinDir, LOW);
 			Serial.print("Spin Position = "); // DEBUG messages
 			Serial.println(spinPos);
-			delay(100);
+			delay(10);
 		}
 	}
 	else {
@@ -189,11 +205,11 @@ void spin(long d) {
 				Serial.println("ALERT: EMERGENCY STOP");
 				break;
 			}
-			analogWrite(spinPinPwm, -spinSpeed);
+			analogWrite(spinPinPwm, spinSpeed);
 			digitalWrite(spinPinDir, HIGH);
 			Serial.print("Spin Position = "); // DEBUG messages
 			Serial.println(spinPos);
-			delay(100);
+			delay(10);
 		}
 	}
 	runningTest = false;
@@ -235,6 +251,9 @@ void encoderA() { // Channel A went High
 	if (bFlag) {
 		spinPos--; //increment the encoder's position count
 	}
+	else {
+		spinPos++;
+	}
 	//Serial.print("Spin Position = "); // DEBUG messages
 	//Serial.println(spinPos);
 	sei(); //restart interrupts
@@ -251,64 +270,64 @@ void encoderB() { // Channel B went High
 	sei(); //restart interrupts
 }
 
-//void encoder() { // interrupts on rise and fall
-//	/*
-//		aFlag holds the last position of A
-//		bFlag holds the last position of B
-//		These positions are compared for each combination of A and B detected
-//		if B changes away from A, and A changes to match B, CW
-//		if A changes away from B, and B changes to match A, CCW
-//	*/
-//	cli(); //stop interrupts happening before we read pin values
-//	readEncoder = PIND & 0xC; //read all eight pin values then strip away all but pinA and pinB's values
-//	switch (readEncoder) {
-//		case B00000000:
-//			if (!(aFlag) && bFlag) { //CCW
-//				spinPos--; //decrement the encoder's position count
-//				bFlag = 0; //updates current position for next interrupt compare
-//			}
-//			else if (aFlag && !(bFlag)) { //CW
-//				spinPos++; //increment the encoder's position count
-//				aFlag = 0; //updates current position for next interrupt compare
-//			}
-//			break;
-//		case B00000100:
-//			if (aFlag && bFlag) { //CCW
-//				spinPos--; //decrement the encoder's position count
-//				aFlag = 0; //updates current position for next interrupt compare
-//			}
-//			else if (!(aFlag) && !(bFlag)) { //CW
-//				spinPos++; //increment the encoder's position count
-//				bFlag = 1; //updates current position for next interrupt compare
-//			}
-//			break;
-//		case B00001000:
-//			if (!(aFlag) && !(bFlag)) {
-//				spinPos--; //decrement the encoder's position count
-//				aFlag = 1; //updates current position for next interrupt compare
-//			}
-//			else if (aFlag && bFlag) {
-//				spinPos++; //increment the encoder's position count
-//				bFlag = 0; //updates current position for next interrupt compare
-//			}
-//			break;
-//		case B00001100:
-//			if (aFlag && !(bFlag)) { //CCW
-//				spinPos--; //decrement the encoder's position count
-//				bFlag = 1; //updates current position for next interrupt compare
-//			}
-//			else if (!(aFlag) && bFlag) { //CW
-//				spinPos++; //increment the encoder's position count
-//				aFlag = 1; //updates current position for next interrupt compare
-//			}
-//			break;
-//		default:
-//			break;
-//	}
+void encoder() { // interrupts on rise and fall
+	/*
+		aFlag holds the last position of A
+		bFlag holds the last position of B
+		These positions are compared for each combination of A and B detected
+		if B changes away from A, and A changes to match B, CW
+		if A changes away from B, and B changes to match A, CCW
+	*/
+	cli(); //stop interrupts happening before we read pin values
+	readEncoder = PIND & 0xC; //read all eight pin values then strip away all but pinA and pinB's values
+	switch (readEncoder) {
+		case B00000000:
+			if (!(aFlag) && bFlag) { //CCW
+				spinPos--; //decrement the encoder's position count
+				bFlag = 0; //updates current position for next interrupt compare
+			}
+			else if (aFlag && !(bFlag)) { //CW
+				spinPos++; //increment the encoder's position count
+				aFlag = 0; //updates current position for next interrupt compare
+			}
+			break;
+		case B00000100:
+			if (aFlag && bFlag) { //CCW
+				spinPos--; //decrement the encoder's position count
+				aFlag = 0; //updates current position for next interrupt compare
+			}
+			else if (!(aFlag) && !(bFlag)) { //CW
+				spinPos++; //increment the encoder's position count
+				bFlag = 1; //updates current position for next interrupt compare
+			}
+			break;
+		case B00001000:
+			if (!(aFlag) && !(bFlag)) {
+				spinPos--; //decrement the encoder's position count
+				aFlag = 1; //updates current position for next interrupt compare
+			}
+			else if (aFlag && bFlag) {
+				spinPos++; //increment the encoder's position count
+				bFlag = 0; //updates current position for next interrupt compare
+			}
+			break;
+		case B00001100:
+			if (aFlag && !(bFlag)) { //CCW
+				spinPos--; //decrement the encoder's position count
+				bFlag = 1; //updates current position for next interrupt compare
+			}
+			else if (!(aFlag) && bFlag) { //CW
+				spinPos++; //increment the encoder's position count
+				aFlag = 1; //updates current position for next interrupt compare
+			}
+			break;
+		default:
+			break;
+	}
 //	Serial.print("Spin Position = "); // DEBUG
 //	Serial.println(spinPos);
-//	sei(); //restart interrupts
-//}
+	sei(); //restart interrupts
+}
 
 String parse(String data, char separator, int index) { // splits input string by char separator, pieces accessible by index 0..*
 	int found = 0;
