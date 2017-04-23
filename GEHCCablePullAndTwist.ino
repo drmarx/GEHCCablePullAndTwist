@@ -126,7 +126,8 @@ void command(String cmd) {
 		digitalWrite(restLED, HIGH);
 		// spin to 0?
 		//linear(0);
-		Serial.println("RESTING");
+		//Serial.println("RESTING");
+		runningTest = false;
 	}
 	else if (cmd.equals("STOP")) {
 		digitalWrite(runLED, LOW);
@@ -134,6 +135,9 @@ void command(String cmd) {
 		//linear(0);
 		//spin(0);
 		runningTest = false;
+	}
+	else if (cmd.equals("STATUS")) {
+		Serial.println(runningTest);
 	}
 }
 
