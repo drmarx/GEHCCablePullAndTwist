@@ -1,6 +1,6 @@
 #include <dht11.h> // temp/humid sensor
 #define DHT11_PIN 8
-const int tempSensor = A0; // DEBUG sample sensor
+const int linPot = A0; // DEBUG sample sensor
 const int contSensor = A1; // pin for continuity resistance test
 const int spinPinPwm = 6; // pin for spin motor shield pwm
 const int spinPinDir = 7; // pin for spin motor shield direction
@@ -107,10 +107,7 @@ void command(String cmd) {
 		Serial.println(cont);
 	}
 	else if (cmd.equals("TEMP")) {
-		//getTemp();
 		DHT.read(DHT11_PIN);
-		//Serial.print(temp);
-		//Serial.println(" F");
 		Serial.print(DHT.temperature);
 		Serial.print("C / ");
 		Serial.print(DHT.humidity);
@@ -205,12 +202,6 @@ bool emergencyStop() {
 		return true;
 	}
 	return false;
-}
-
-void getTemp() {
-	int in = analogRead(tempSensor);
-	float voltage = (in / 1024.0) * 5.0; // convert analog to voltage
-	temp = ((voltage - 0.5) * 100.0) * 1.8 + 32.0; // convert voltage to temp in C then to F
 }
 
 void getCont() { // measures resistance in ohms, 0 if disconnected
