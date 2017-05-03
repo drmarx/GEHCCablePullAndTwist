@@ -1,7 +1,9 @@
+#include <WheatstoneBridge.h>
 #include <dht11.h> // temp/humid sensor
 #define DHT11_PIN 8
-const int linPot = A0; // DEBUG sample sensor
-const int contSensor = A1; // pin for continuity resistance test
+const int linPot = A2; // DEBUG sample sensor YELLOW
+const int contSensor = A1; // pin for continuity resistance test BLUE
+const int loadPin = A0; // pin for (amplified) load cell PINK
 const int spinPinPwm = 6; // pin for spin motor shield pwm
 const int spinPinDir = 7; // pin for spin motor shield direction
 const int linPinPwm = 5; // pin for linear actuator motor shield pwm
@@ -17,9 +19,24 @@ volatile long spinPos = 0; // variable for storing spin motor position
 //volatile byte oldSpinPos = 0; // variable for previous spin motor position
 volatile byte readEncoder; // variable for reading input data from encoder
 
+/*
+Variables used with the WheatstoneBridge amplifier for the load cell
+Specifically for calibration
+*/
+const int CST_STRAIN_IN_MIN = 350;       // Raw value calibration lower point
+const int CST_STRAIN_IN_MAX = 650;       // Raw value calibration upper point
+const int CST_STRAIN_OUT_MIN = 0;        // Weight calibration lower point
+const int CST_STRAIN_OUT_MAX = 50000;    // Weight calibration upper point
+const int CST_CAL_FORCE_MIN = 0;
+const int CST_CAL_FORCE_MAX = 32000;
+const int CST_CAL_FORCE_STEP = 50;
+const int CST_CAL_FORCE_STEP_LARGE = 500;
+// Initialize the Wheatstone bridge object
+WheatstoneBridge wsb(A1, CST_STRAIN_IN_MIN, CST_STRAIN_IN_MAX, CST_STRAIN_OUT_MIN, CST_STRAIN_OUT_MAX);
+
 static dht11 DHT; // temp/humid object
-static int spinSpeed = 0;
-static int linSpeed = 0;
+static int spinSpeed;
+static int linSpeed;
 static float temp; // DEBUG sample sensor data
 static float load;
 //static float spinPos;
@@ -43,7 +60,7 @@ void setup() {
 	// Initialize
 	runningTest = false;
 	spinSpeed = 255; // spin speed 8-255
-	linSpeed = 10; // DEBUG: example speed
+	linSpeed = 255; // DEBUG: example speed
 	pinMode(spinPosA, INPUT_PULLUP);
 	pinMode(spinPosB, INPUT_PULLUP);
 	pinMode(spinPinDir, OUTPUT);
@@ -214,7 +231,7 @@ void getCont() { // measures resistance in ohms, 0 if disconnected
 }
 
 void spin(long d) {
-	Serial.println("Spin started");
+	//Serial.println("Spin started");
 	if (d > 0) {
 		while (spinPos < d) {
 			if (emergencyStop()) { // emergency stop
@@ -258,7 +275,7 @@ void linear(int f) {
 				break;
 			}
 			analogWrite(linPinPwm, linSpeed);
-			digitalWrite(linPinDir, LOW);
+			digitalWrite(linPinDir, HIGH);
 			delay(10);
 		}
 	}
@@ -269,14 +286,15 @@ void linear(int f) {
 				break;
 			}
 			analogWrite(linPinPwm, -linSpeed);
-			digitalWrite(linPinDir, HIGH);
+			digitalWrite(linPinDir, LOW);
 			delay(10);
 		}
 	}
 }
 
 void getLoad() {
-	load = 0;
+	int l = wsb.measureForce();
+	load = (float) l; // convert this to kgs
 }
 
 void encoderA() { // Channel A went High
