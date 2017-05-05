@@ -2,8 +2,8 @@
 #include <dht11.h> // temp/humid sensor
 #define DHT11_PIN 8
 const int linPot = A2; // DEBUG sample sensor YELLOW
-const int contSensor = A1; // pin for continuity resistance test BLUE
-const int loadPin = A0; // pin for (amplified) load cell PINK
+const int contSensor = A0; // pin for continuity resistance test BLUE
+const int loadPin = A1; // pin for (amplified) load cell PINK
 const int spinPinPwm = 6; // pin for spin motor shield pwm
 const int spinPinDir = 7; // pin for spin motor shield direction
 const int linPinPwm = 5; // pin for linear actuator motor shield pwm
@@ -39,7 +39,9 @@ static int spinSpeed;
 static int linSpeed;
 static float temp; // DEBUG sample sensor data
 static float load;
+static float inLoad;
 //static float spinPos;
+static float linPos;
 static float cont;
 static bool runningTest;
 
@@ -59,7 +61,7 @@ static Params p;	// test parameters
 void setup() {
 	// Initialize
 	runningTest = false;
-	spinSpeed = 255; // spin speed 8-255
+	spinSpeed = 100; // spin speed 8-255
 	linSpeed = 255; // DEBUG: example speed
 	pinMode(spinPosA, INPUT_PULLUP);
 	pinMode(spinPosB, INPUT_PULLUP);
@@ -73,20 +75,30 @@ void setup() {
 	//attachInterrupt(1, encoder, CHANGE);
 	Serial.begin(9600);
 	Serial.setTimeout(100);
-	//Serial.println("GEHC Cable Pull & Twist initialized. Awaiting commands...");
-	//Serial.println("Available commands: TEST <length of test in minutes<int>> <rest time in seconds<int>> <test repetitions<int>> <force in kgs<float>>");
-	//Serial.println("<spin turn degrees<int>> <continuity break stop<int[0,1]>>, START, STOP, TEMP, RATE <poll rate in seconds<float>>, SPIN <deg>");
+	linear(0);
+	Serial.println("GEHC Cable Pull & Twist initialized. Awaiting commands...");
+	Serial.println("Available commands: TEST <length of test in minutes<int>> <rest time in seconds<int>> <test repetitions<int>> <force in kgs<float>>");
+	Serial.println("<spin turn degrees<int>> <continuity break stop<int[0,1]>>, START, STOP, TEMP, RATE <poll rate in seconds<float>>, SPIN <deg>");
 }
 
 void loop() {
 	if (runningTest) {
 		runTest();
+		// print messages
+		//Serial.print("SpinPos = ");
+		//Serial.println(spinPos);
 	}
 	String in;
 	if (Serial.available()) in = Serial.readString();
 	command(in);
-	//Serial.print("Spin Position ");
-	//Serial.println(spinPos);
+	getLinPos();
+	getLoad();
+	//Serial.print("Linear Position = ");
+	//Serial.println(linPos);
+	Serial.print("Load = ");
+	Serial.println(load);
+	linear(inLoad);
+	//linear(0);
 }
 
 void serialEvent() {
@@ -105,7 +117,7 @@ void command(String cmd) {
 		p.force = args[3].toFloat();
 		p.deg = args[4].toInt() * 24; // converts degrees to spin counter units
 		p.cont = args[5].toInt();
-		//Serial.println("Parameters received. Ready to start.");
+		Serial.println("Parameters received. Ready to start.");
 	}
 	else if (cmd.startsWith("RATE")) {
 		p.freq = parse(cmd, ' ', 1).toFloat();
@@ -113,13 +125,13 @@ void command(String cmd) {
 	else if (cmd.equals("START") && !(runningTest)) {
 		digitalWrite(runLED, HIGH);
 		digitalWrite(restLED, LOW);
-		//spin(p.deg);
+		spin(p.deg);
 		runningTest = true;
 	}
 	else if (cmd.equals("DATA")) {
 		Serial.print(load);
 		Serial.print(" ");
-		Serial.print(spinPos);
+		Serial.print(spinPos / 24);
 		Serial.print(" ");
 		Serial.println(cont);
 	}
@@ -131,7 +143,7 @@ void command(String cmd) {
 		Serial.println("%");
 	}
 	else if (cmd.startsWith("SPIN")) {
-		int arg = parse(cmd, ' ', 1).toInt();
+		int arg = parse(cmd, ' ', 1).toInt() * 24;
 		runningTest = true;
 		spin(arg);
 	}
@@ -139,7 +151,8 @@ void command(String cmd) {
 		digitalWrite(runLED, LOW);
 		digitalWrite(restLED, HIGH);
 		// spin to 0?
-		//linear(0);
+		spin(0);
+		linear(0);
 		//Serial.println("RESTING");
 		runningTest = false;
 	}
@@ -150,6 +163,10 @@ void command(String cmd) {
 		//spin(0);
 		runningTest = false;
 	}
+	else if (cmd.startsWith("PULL")) {
+		inLoad = parse(cmd, ' ', 1).toFloat();
+		//linear(arg);
+	}
 	else if (cmd.equals("STATUS")) {
 		Serial.println(runningTest);
 	}
@@ -158,8 +175,9 @@ void command(String cmd) {
 void runTest() {
 	getLoad();
 	getCont();
-	//spin(p.deg);
-	//linear(p.force);
+	getLinPos();
+	spin(p.deg);
+	linear(p.force);
 	//spinMotor(p.deg);
 	//runningTest = true;
 	/*
@@ -236,6 +254,7 @@ void spin(long d) {
 		while (spinPos < d) {
 			if (emergencyStop()) { // emergency stop
 				Serial.println("ALERT: EMERGENCY STOP");
+				analogWrite(spinPinPwm, 0);
 				break;
 			}
 			analogWrite(spinPinPwm, spinSpeed);
@@ -253,6 +272,7 @@ void spin(long d) {
 		while (spinPos > 0){
 			if (emergencyStop()) { // emergency stop
 				Serial.println("ALERT: EMERGENCY STOP");
+				analogWrite(spinPinPwm, 0);
 				break;
 			}
 			analogWrite(spinPinPwm, spinSpeed);
@@ -267,25 +287,30 @@ void spin(long d) {
 	Serial.println("Spin stopped");
 }
 
-void linear(int f) {
+void linear(float f) {
 	if (f > 0) {
-		while (load < f) {
+		getLoad();
+		if (load < f && linPos < 3.0) {
 			if (emergencyStop()) { // emergency stop
 				Serial.println("ALERT: EMERGENCY STOP");
-				break;
+				analogWrite(linPinPwm, 0);
+				//break;
 			}
 			analogWrite(linPinPwm, linSpeed);
 			digitalWrite(linPinDir, HIGH);
 			delay(10);
 		}
+		else analogWrite(linPinPwm, 0);
 	}
 	else {
-		while (load != 0) {
+		while (linPos >= 0.6) {
 			if (emergencyStop()) { // emergency stop
 				Serial.println("ALERT: EMERGENCY STOP");
+				analogWrite(linPinPwm, 0);
 				break;
 			}
-			analogWrite(linPinPwm, -linSpeed);
+			getLinPos();
+			analogWrite(linPinPwm, linSpeed);
 			digitalWrite(linPinDir, LOW);
 			delay(10);
 		}
@@ -293,8 +318,13 @@ void linear(int f) {
 }
 
 void getLoad() {
-	int l = wsb.measureForce();
-	load = (float) l; // convert this to kgs
+	int l = -wsb.measureForce();
+	load = (l > 0) ? (float) l / 330 : 0; // converts to kgs
+}
+
+void getLinPos() {
+	int in = analogRead(linPot);
+	linPos = (in / 1024.0) * 5.0;
 }
 
 void encoderA() { // Channel A went High
