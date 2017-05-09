@@ -206,7 +206,7 @@ void getCont() { // measures resistance in ohms, 0 if disconnected
 	int in = analogRead(contSensor);
 	if (in) {
 		float voltage = (in / 1024.0) * 5.0;
-		cont = ((5.0 / voltage) - 1.0) * 1000.0;
+		cont = ((50 * voltage) - 125) / (5 - voltage);
 	}
 	else cont = 0;
 }
