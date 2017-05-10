@@ -33,6 +33,7 @@ WheatstoneBridge wsb(A1, CST_STRAIN_IN_MIN, CST_STRAIN_IN_MAX, CST_STRAIN_OUT_MI
 static dht11 DHT; // temp/humid object
 static int spinSpeed = 200;
 static int linSpeed = 100;
+static int offset;
 static float temp; // DEBUG sample sensor data
 static float load = 0;
 static float inLoad = 0;
@@ -182,6 +183,10 @@ void command(String cmd) {
 	else if (cmd.equals("STATUS")) {
 		Serial.println(runningTest);
 	}
+	
+	else if (cmd.equals("CALIBRATE")) {
+		calibrate();
+	}
 }
 
 void runTest() {
@@ -288,7 +293,7 @@ void linear(float f) {
 }
 
 void getLoad() {
-	int l = -wsb.measureForce() + 2025;
+	int l = -wsb.measureForce() + offset;
 	//load = l;
 	load = (l > 0) ? (float)l / 387.16 : 0; // converts to kgs 
 }
@@ -311,6 +316,16 @@ void encoder() { // Channel A went High
 	//Serial.println(spinPos);
 	sei(); //restart interrupts
 }
+
+void calibrate(){
+	int avg = 0;
+	for (int i = 0; i < 10; i++){
+		avg += wsb.measureForce()
+		delay(100);
+	}
+	avg /= 10;
+	offset = -avg;
+}	
 
 
 String parse(String data, char separator, int index) { // splits input string by char separator, pieces accessible by index 0..*
