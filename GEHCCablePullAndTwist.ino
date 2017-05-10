@@ -1,5 +1,6 @@
-#include <WheatstoneBridge.h>
+#include <WheatstoneBridge.h> // load cell amplifier library
 #include <dht11.h> // temp/humid sensor
+#include <avr/wdt.h> // watchdog
 #define DHT11_PIN 8
 const int linPot = A2; // DEBUG sample sensor YELLOW
 const int contSensor = A0; // pin for continuity resistance test BLUE
@@ -19,15 +20,15 @@ volatile long spinPos = 0; // variable for storing spin motor position
 						   //volatile byte oldSpinPos = 0; // variable for previous spin motor position
 volatile byte readEncoder; // variable for reading input data from encoder
 
-/*
-Variables used with the WheatstoneBridge amplifier for the load cell
-Specifically for calibration
-*/
+						   /*
+						   Variables used with the WheatstoneBridge amplifier for the load cell
+						   Specifically for calibration
+						   */
 const int CST_STRAIN_IN_MIN = 350;       // Raw value calibration lower point
 const int CST_STRAIN_IN_MAX = 650;       // Raw value calibration upper point
 const int CST_STRAIN_OUT_MIN = 0;        // Weight calibration lower point
 const int CST_STRAIN_OUT_MAX = 50000;    // Weight calibration upper point
-// Initialize the Wheatstone bridge object
+										 // Initialize the Wheatstone bridge object
 WheatstoneBridge wsb(A1, CST_STRAIN_IN_MIN, CST_STRAIN_IN_MAX, CST_STRAIN_OUT_MIN, CST_STRAIN_OUT_MAX);
 
 static dht11 DHT; // temp/humid object
@@ -40,7 +41,7 @@ static float inLoad = 0;
 //static float spinPos;
 static float linPos;
 static float cont;
-static bool runningTest;
+static bool runningTest = false;
 
 struct params {
 	int mins;
@@ -69,14 +70,16 @@ void setup() {
 	attachInterrupt(0, encoder, RISING);
 	Serial.begin(9600);
 	Serial.setTimeout(100);
-	//linear(0);
+	linear(0);
+	calibrate();
 	//Serial.println("GEHC Cable Pull & Twist initialized. Awaiting commands...");
 	//Serial.println("Available commands: TEST <length of test in minutes<int>> <rest time in seconds<int>> <test repetitions<int>> <force in kgs<float>>");
 	//Serial.println("<spin turn degrees<int>> <continuity break stop<int[0,1]>>, START, STOP, TEMP, RATE <poll rate in seconds<float>>, SPIN <deg>");
-	Serial.flush();
+	wdt_enable(WDTO_2S); // initialize watchdog at 2s limit
 }
 
 void loop() {
+	wdt_reset(); // tell watchdog everything is okay
 	if (runningTest) {
 		runTest();
 		// print messages
@@ -92,14 +95,20 @@ void loop() {
 	}
 	getLinPos();
 	getLoad();
+	getCont();
+	//Serial.println(analogRead(contSensor));
 	//Serial.print("Spin Pos = ");
 	//Serial.println(spinPos);
 	//Serial.print("Linear Position = ");
 	//Serial.println(linPos);
-	Serial.print("Load = \t\t");
-	Serial.println(load);
-	Serial.print("Rload = \t");
-	Serial.println(-wsb.measureForce() + 2025);
+	//Serial.print("Load = \t\t");
+	//Serial.println(load);
+	//Serial.print("Rload = \t");
+	//Serial.println(-wsb.measureForce() + 2025);
+	if (inLoad != 0) {
+		Serial.print("Load = ");
+		Serial.println(load);
+	}
 	linear(inLoad);
 	//linear(0);
 }
@@ -183,8 +192,8 @@ void command(String cmd) {
 	else if (cmd.equals("STATUS")) {
 		Serial.println(runningTest);
 	}
-	
-	else if (cmd.equals("CALIBRATE")) {
+
+	else if (cmd.equals("CAL")) {
 		calibrate();
 	}
 }
@@ -217,7 +226,8 @@ void getCont() { // measures resistance in ohms, 0 if disconnected
 }
 
 void spin(long d) {
-	//Serial.println("Spin started");
+	wdt_reset(); // allows spin to go longer
+				 //Serial.println("Spin started");
 	if (d > 0) {
 		while (spinPos < d) {
 			if (emergencyStop()) { // emergency stop
@@ -317,15 +327,18 @@ void encoder() { // Channel A went High
 	sei(); //restart interrupts
 }
 
-void calibrate(){
+void calibrate() {
+	//Serial.println("Starting calibration ...");
 	int avg = 0;
-	for (int i = 0; i < 10; i++){
-		avg += wsb.measureForce()
+	for (int i = 0; i < 10; i++) {
+		avg += wsb.measureForce();
 		delay(100);
 	}
 	avg /= 10;
-	offset = -avg;
-}	
+	offset = avg;
+	//Serial.print("Finished calibration. Offset = ");
+	//Serial.println(offset);
+}
 
 
 String parse(String data, char separator, int index) { // splits input string by char separator, pieces accessible by index 0..*
