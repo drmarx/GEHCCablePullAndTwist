@@ -38,7 +38,6 @@ static int offset;
 static float temp; // DEBUG sample sensor data
 static float load = 0;
 static float inLoad = 0;
-//static float spinPos;
 static float linPos;
 static float cont;
 static bool runningTest = false;
@@ -82,9 +81,6 @@ void loop() {
 	wdt_reset(); // tell watchdog everything is okay
 	if (runningTest) {
 		runTest();
-		// print messages
-		//Serial.print("SpinPos = ");
-		//Serial.println(spinPos);
 	}
 	String in;
 	if (Serial.available()) {
@@ -96,15 +92,6 @@ void loop() {
 	getLinPos();
 	getLoad();
 	getCont();
-	//Serial.println(analogRead(contSensor));
-	//Serial.print("Spin Pos = ");
-	//Serial.println(spinPos);
-	//Serial.print("Linear Position = ");
-	//Serial.println(linPos);
-	//Serial.print("Load = \t\t");
-	//Serial.println(load);
-	//Serial.print("Rload = \t");
-	//Serial.println(-wsb.measureForce() + 2025);
 	if (inLoad != 0) {
 		Serial.print("Load = ");
 		Serial.println(load);
