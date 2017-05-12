@@ -71,6 +71,11 @@ void setup() {
 	Serial.setTimeout(100);
 	linear(0);
 	calibrate();
+	//Serial.println("GEHC Cable Pull & Twist initialized. Awaiting commands...");
+	//Serial.println("Available commands: TEST <length of test in minutes<int>> <rest time in seconds<int>> <test repetitions<int>> <force in kgs<float>>");
+	//Serial.println("<spin turn degrees<int>> <continuity break stop (0=y,1=n)<int[0,1]>>, START, STOP, TEMP, RATE <poll rate in seconds<float>>, SPIN <deg>");
+	//Serial.println("CAL (calibrates load cell), PULL <kg (0 to push all the way up)>, DATA, STATUS <runningTest>")
+	//Serial.println("To use, enter TEST <...> command, then enter RATE <...> for poll speed, then START. While test running enter STOP to abort")
 }
 
 void loop() {
@@ -157,6 +162,9 @@ void command(String cmd) {
 	else if (cmd.equals("CAL")) {
 		calibrate();
 	}
+	else if (cmd.equals("RATE")){
+		
+	}
 	wdt_reset();
 }
 
@@ -173,7 +181,7 @@ void runTest() {
 	int freq = p.freq * 1000;
 	int runTime = p.mins * 60;
 	for (int i = 1; i <= p.reps; i++) { // repeats test suite
-		for (float j = 0; j < runTime; j += p.freq) { // check sensors every quarter second
+		for (float j = 0; j < runTime; j += p.freq) { // check sensors every p.freq seconds
 			if (emergencyStop()) { // emergency stop
 				Serial.println("ALERT: EMERGENCY STOP");
 				break;
@@ -181,7 +189,6 @@ void runTest() {
 			spin(p.deg);
 			getLoad();
 			linear(inLoad);
-			//getTemp();
 			getCont();
 			// access test data with variables
 			// pulled force = load
@@ -205,7 +212,11 @@ void runTest() {
 				Serial.println("ohm");
 			}
 			else Serial.println("DISCONNECT");
-			delay(freq);
+			//delay(freq);
+			for (int i = 0; i < freq; i += (freq/10)){
+				getload();
+				linear(inLoad);
+			}
 		}
 		//spinMotor(0); // uncomment this line to have it spin back during rest periods.
 		linear(0);
@@ -300,7 +311,10 @@ void linear(float f) {
 		//  digitalWrite(linPinDir, LOW);
 		//  delay(10);
 		//}
-		else analogWrite(linPinPwm, 0);
+		else {
+		 analogWrite(linPinPwm, 0);
+		 delay(10);
+		}
 	}
 	else {
 		if (linPos >= 0.7) {
