@@ -118,7 +118,7 @@ void command(String cmd) {
 		Serial.print(" ");
 		Serial.print(spinPos / 24);
 		Serial.print(" ");
-		Serial.print(cont);
+		Serial.println(cont);
 	}
 	else if (cmd.equals("TEMP")) {
 		DHT.read(DHT11_PIN);
