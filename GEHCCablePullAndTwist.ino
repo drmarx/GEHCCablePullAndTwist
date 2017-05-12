@@ -163,7 +163,7 @@ void command(String cmd) {
 		calibrate();
 	}
 	else if (cmd.equals("RATE")){
-		
+		p.freq = parse(cmd, ' ', 1).toFloat();
 	}
 	wdt_reset();
 }
@@ -202,11 +202,12 @@ void runTest() {
 			Serial.print(p.reps);
 			Serial.print(" ");
 			Serial.print(j);
-			Serial.print("s: Temp = ");
-			Serial.print(temp);
-			Serial.print("F Spin = ");
-			Serial.print(spinPos);
-			Serial.print("u Cont = ");
+			Serial.print(" Force = ");
+			Serial.print(load);
+			Serial.print("kg Spin =")
+			Serial.print(" Spin = ");
+			Serial.print(spinPos/24.33);
+			Serial.print("deg Cont = ");
 			if (cont > 0) {
 				Serial.print(cont);
 				Serial.println("ohm");
@@ -227,7 +228,8 @@ void runTest() {
 		delay(p.rest * 1000); // maybe go into new for loop like lines 176 & 177 to give feedback about rest perio
 	}
 	Serial.println("Test stopped.");
-	runningTest = false; */
+	runningTest = false;
+	*/
 }
 
 bool emergencyStop() {
