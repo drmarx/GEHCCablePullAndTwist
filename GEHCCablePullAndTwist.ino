@@ -133,15 +133,15 @@ void command(String cmd) {
 		spin(arg);
 	}
 	else if (cmd.equals("REST")) {
-		digitalWrite(runLED, LOW);
-		digitalWrite(restLED, HIGH);
+		//digitalWrite(runLED, LOW);
+		//digitalWrite(restLED, HIGH);
 		inLoad = 0;
 		linear(inLoad);
 		runningTest = false;
 	}
 	else if (cmd.equals("STOP")) {
-		digitalWrite(runLED, LOW);
-		digitalWrite(restLED, HIGH);
+		//digitalWrite(runLED, LOW);
+		//digitalWrite(restLED, HIGH);
 		inLoad = 0;
 		linear(inLoad);
 		spin(0);
@@ -157,6 +157,7 @@ void command(String cmd) {
 	else if (cmd.equals("CAL")) {
 		calibrate();
 	}
+	wdt_reset();
 }
 
 void runTest() {
@@ -226,6 +227,7 @@ void spin(long d) {
 	}
 	runningTest = false;
 	analogWrite(spinPinPwm, 0);
+	wdt_reset();
 	//Serial.println("Spin stopped");
 }
 
@@ -250,7 +252,7 @@ void linear(float f) {
 		else analogWrite(linPinPwm, 0);
 	}
 	else {
-		if (linPos >= 0.6) {
+		if (linPos >= 0.7) {
 			if (emergencyStop()) { // emergency stop
 				Serial.println("ALERT: EMERGENCY STOP");
 				analogWrite(linPinPwm, 0);
