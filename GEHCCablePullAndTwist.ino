@@ -161,20 +161,71 @@ void command(String cmd) {
 }
 
 void runTest() {
+	inload = p.force;
 	getLoad();
 	getCont();
 	getLinPos();
 	spin(p.deg);
 	linear(inLoad);
+	*/
+	spinMotor(p.deg);
+	runningTest = true;
+	int freq = p.freq * 1000;
+	int runTime = p.mins * 60;
+	for (int i = 1; i <= p.reps; i++) { // repeats test suite
+		for (float j = 0; j < runTime; j += p.freq) { // check sensors every quarter second
+			if (emergencyStop()) { // emergency stop
+				Serial.println("ALERT: EMERGENCY STOP");
+				break;
+			}
+			spin(p.deg);
+			getLoad();
+			linear(inLoad);
+			//getTemp();
+			getCont();
+			// access test data with variables
+			// pulled force = load
+			// temperature = DHT.temperature
+			// humidity = DHT.humidity
+			// spin position = spinPos
+			// print data with Serial.print() with the last one being .println()
+			Serial.print("Test ");
+			Serial.print(i);
+			Serial.print("/");
+			Serial.print(p.reps);
+			Serial.print(" ");
+			Serial.print(j);
+			Serial.print("s: Temp = ");
+			Serial.print(temp);
+			Serial.print("F Spin = ");
+			Serial.print(spinPos);
+			Serial.print("u Cont = ");
+			if (cont > 0) {
+				Serial.print(cont);
+				Serial.println("ohm");
+			}
+			else Serial.println("DISCONNECT");
+			delay(freq);
+		}
+		//spinMotor(0); // uncomment this line to have it spin back during rest periods.
+		linear(0);
+		if (!(runningTest)) break;
+		Serial.print("Resting for ");
+		Serial.print(p.rest);
+		Serial.println(" seconds");
+		delay(p.rest * 1000); // maybe go into new for loop like lines 176 & 177 to give feedback about rest perio
+	}
+	Serial.println("Test stopped.");
+	runningTest = false; */
 }
 
 bool emergencyStop() {
-	//String in;
-	//if (Serial.available()) in = Serial.readString();
-	//if (in.equalsIgnoreCase("STOP") || (p.cont && cont == 0)) {
-	//  runningTest = false;
-	//  return true;
-	//}
+	String in;
+	if (Serial.available()) in = Serial.readString();
+	if (in.equalsIgnoreCase("STOP") || (p.cont && cont == 0)) {
+	  runningTest = false;
+	  return true;
+	}
 	return false;
 }
 
